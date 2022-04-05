@@ -2,25 +2,26 @@ package com.example.springbootsecurityjwtdemo.security;
 
 import com.example.springbootsecurityjwtdemo.bean.dto.RolePermissionDto;
 import com.example.springbootsecurityjwtdemo.mapper.RolePermissionMapper;
-import com.example.springbootsecurityjwtdemo.mapper.RolesMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.AccessDecisionManager;
 import org.springframework.security.access.AccessDecisionVoter;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.ConfigAttribute;
+import org.springframework.security.access.SecurityConfig;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.vote.AffirmativeBased;
 import org.springframework.security.access.vote.RoleHierarchyVoter;
 import org.springframework.security.access.vote.RoleVoter;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.web.FilterInvocation;
 import org.springframework.security.web.access.intercept.FilterInvocationSecurityMetadataSource;
 import org.springframework.security.web.access.intercept.FilterSecurityInterceptor;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.util.AntPathMatcher;
+
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Configuration
 public class MyFilterSecurityInterceptor {
@@ -45,14 +46,16 @@ public class MyFilterSecurityInterceptor {
             }
         }
         return new FilterInvocationSecurityMetadataSource() {
+            private final AntPathMatcher antPathMatcher = new AntPathMatcher();
             @Override
             public Collection<ConfigAttribute> getAttributes(Object object) throws IllegalArgumentException {
                 if (object instanceof FilterInvocation){
                     FilterInvocation fi = (FilterInvocation) object;
+                    String url = fi.getRequestUrl();
+                    System.out.println(url);
                     for (String pattern : setMap.keySet()){
-                        AntPathRequestMatcher matcher = new AntPathRequestMatcher(pattern);
-                        if (matcher.matches(fi.getHttpRequest())){
-                            return setMap.get(pattern).stream().map(n-> (ConfigAttribute) () -> n).collect(Collectors.toList());//返回url匹配的资源
+                        if(antPathMatcher.match(pattern,url)){
+                            return SecurityConfig.createList(setMap.get(pattern).toArray(new String[0]));
                         }
                     }
                 }
@@ -71,6 +74,40 @@ public class MyFilterSecurityInterceptor {
         };
     }
 
+    @Bean
+    public FilterInvocationSecurityMetadataSource dynamicFilterInvocationSecurityMetadataSource(){
+
+        return new FilterInvocationSecurityMetadataSource() {
+            @Override
+            public Collection<ConfigAttribute> getAttributes(Object object) throws IllegalArgumentException {
+                if (object instanceof FilterInvocation){
+                    FilterInvocation fi = (FilterInvocation) object;
+                    String url = fi.getRequestUrl();
+                    System.out.println(url);
+                    /*
+                    例：url = "/sql/test"
+                    具体思路 select * from role_permission where url = '/sql/test'
+                    动态权限我进行确定查找，不进行模糊查找
+                    如果你想进行模糊查找可以使用in的方法：SELECT * from role_permission WHERE url in ('/sql/test','/**','/*') ORDER BY url desc
+                     */
+                    List<String> roleNameList = rolePermissionMapper.selectNameFromUrl(url);
+                    if(roleNameList!=null){
+                        return SecurityConfig.createList(roleNameList.toArray(new String[0]));
+                    }
+                }
+                return null;
+            }
+            @Override
+            public Collection<ConfigAttribute> getAllConfigAttributes() {
+                return null;
+            }
+
+            @Override
+            public boolean supports(Class<?> clazz) {
+                return true;
+            }
+        };
+    }
 
     @Bean//配置FilterSecurityInterceptor
     public FilterSecurityInterceptor filterSecurityInterceptor(){
@@ -84,7 +121,10 @@ public class MyFilterSecurityInterceptor {
 
         FilterSecurityInterceptor filterSecurityInterceptor = new FilterSecurityInterceptor();
         filterSecurityInterceptor.setAccessDecisionManager(accessDecisionManager);
-        filterSecurityInterceptor.setSecurityMetadataSource(filterInvocationSecurityMetadataSource());
+        // 不配置动态权限
+        // filterSecurityInterceptor.setSecurityMetadataSource(filterInvocationSecurityMetadataSource());
+        // 第一种设置动态权限
+        filterSecurityInterceptor.setSecurityMetadataSource(dynamicFilterInvocationSecurityMetadataSource());
         filterSecurityInterceptor.setObserveOncePerRequest(false);
         return filterSecurityInterceptor;
     }

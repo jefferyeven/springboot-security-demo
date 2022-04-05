@@ -13,4 +13,7 @@ public interface RolePermissionMapper {
     List<RolePermissionDto> selectAllRolePermissionDto();
     @Insert("INSERT INTO role_permission (roleid,url) VALUES(#{roleid},#{url})")
     int insertRolePermission(long roleid,String url);
+    @Select("SELECT a.`name` as name FROM roles as a INNER JOIN role_permission as b ON a.id = b.roleid where b.url = #{url}")
+    List<String> selectNameFromUrl(String url);
+
 }

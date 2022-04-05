@@ -1,10 +1,9 @@
 package com.example.springbootsecurityjwtdemo.controller;
 
-import com.example.springbootsecurityjwtdemo.mapper.UsersMapper;
 import com.example.springbootsecurityjwtdemo.result.Response;
 import com.example.springbootsecurityjwtdemo.result.ResponseMag;
 import com.example.springbootsecurityjwtdemo.result.ResponseUtil;
-import com.example.springbootsecurityjwtdemo.security.SecurityConfig;
+import com.example.springbootsecurityjwtdemo.security.MySecurityConfig;
 import com.example.springbootsecurityjwtdemo.service.LoginService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -20,7 +19,7 @@ public class LoginController {
     @Autowired
     LoginService loginService;
     @Autowired
-    SecurityConfig securityConfig;
+    MySecurityConfig mySecurityConfig;
     @Autowired
     ApplicationContext applicationContext;
     @GetMapping("login")
